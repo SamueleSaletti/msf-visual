@@ -3,6 +3,13 @@
 #define GRAFO.H
 
 #include <stdbool.h>
+#include <string.h>
+#include <stdio.h>
+
+
+// funzione di terminazione in caso di errore 
+void termina(const char *messaggio);
+
 
 // struct che definisce un arco, il puntatore NEXT serve per le liste concatenate della hash table (gestione collisioni)
 // msf è true solamente per gli archi della minimum spanning forest
@@ -36,6 +43,15 @@ typedef struct {
   // CAMPI MULTITHREADING 
 } grafo;
 
+
+arco **parse_file(FILE *f, int *nodi, int *archi);
+
+// ALGORITMO DI KRUSKAL, dato il grafo ritorna la msf usando una disjoint-set ds per trovare se due nodi fanno parte dello stesso albero (e individuare i cicli)
+
+
+// calcola il numero primo che precede n
+int primo_precedente(int n);
+bool is_prime(int n);
 
 
 
