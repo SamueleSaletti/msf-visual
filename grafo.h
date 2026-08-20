@@ -22,7 +22,7 @@ typedef struct arco{
 } arco;
 
 
-typedef struct {
+typedef struct elemento{
   int id;   // indice del nodo       
   int w;    // peso 
   bool msf; // true sse questo arco appartiene alla MSF
@@ -43,11 +43,25 @@ typedef struct {
   // CAMPI MULTITHREADING 
 } grafo;
 
+// struct usata dalla union find per gestire i set, se un elemento corrisponde al parent è la root di quell'insieme
+typedef struct {
+    int parent;
+    int rank;         // usato per la union by rank
+    int min_id;       // usato per popolare più velocemente l'array cCon, visto che la root potrebbe non essere l'elemento con id minim
+} nodo_union;
 
 arco **parse_file(FILE *f, int *nodi, int *archi);
 
 // ALGORITMO DI KRUSKAL, dato il grafo ritorna la msf usando una disjoint-set ds per trovare se due nodi fanno parte dello stesso albero (e individuare i cicli)
+int confronta_archi(const void*a, const void*b);
+int find(nodo_union *array_nodi, int id_nodo);
+void union_rank(nodo_union *array_nodi, int root_x, int root_y);
+arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi);
 
+
+//funzione che dato l'array di archi parsato mi ritorna la rappresentazione del grafo applicando kruskal 
+//e popolando gHash, vicini e cCon, calcolando poi costoMSF e numCoCo
+grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi);
 
 // calcola il numero primo che precede n
 int primo_precedente(int n);
