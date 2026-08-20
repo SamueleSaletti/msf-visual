@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "grafo.h"
+#include <assert.h>
 
 
 
@@ -120,7 +121,7 @@ int find(nodo_union *array_nodi, int id_nodo){
 }
 
 //unisco le due comoponenti se le root dei due nodi che sto trattando sono diverse
-void union_rank(nodo_union *array_nodi, int root_x, int root_y){
+void union_rank(nodo_union *array_nodi, int root_x, int root_y, int*numCoCo){
 
     if(root_x == root_y) return;
 
@@ -141,10 +142,12 @@ void union_rank(nodo_union *array_nodi, int root_x, int root_y){
         array_nodi[root_x].rank += 1;
         array_nodi[root_x].min_id = nuovo_minimo;
     }
+    // se faccio merge decremenento le componenti connesse
+    *numCoCo -= 1;
 
 }
-
-arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi){
+// passo anche puntatore a numCoCo per sovrascriverlo durante la Union
+arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi,int *numCoCo){
 
     //ora array_archi è ordinato per ordine di peso crescente
     qsort(array_archi,n_archi,sizeof(arco*),&confronta_archi);
@@ -167,7 +170,7 @@ arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi){
         if(root_u != root_v){
             //aggiungo l'arco alla msf
             array_archi[i]->msf = true;
-            union_rank(array_nodi, root_u, root_v);
+            union_rank(array_nodi, root_u, root_v, numCoCo);
 
         }
     }
@@ -186,19 +189,86 @@ arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi){
     return array_archi;
 }
 
+int hash_arco(arco *arco, int hashsize){
+    assert((arco->u) < (arco->v));
+    //calcolo la chiave in questo modo
+    int h = arco->u *31 + arco->v;
+    return h % hashsize;
+}
+
+//dato il puntatore alla testa della lista del nodo corrente, crea l'elemento e lo inserisce nella lista
+void inserisci_ordinato(elemento **testa,int v, int w, bool msf){
+    elemento *nuovo = malloc(sizeof(elemento));
+    nuovo->id = v;
+    nuovo->w = w;
+    nuovo->msf = msf;
+    nuovo->next = NULL;
+
+    // *testa è il puntatore al primo nodo, sarebbe vicini[u]
+    if(*testa == NULL || (*testa)->id >= v){
+        nuovo->next = *testa;
+        *testa = nuovo;
+        return;
+    }
+
+    // scorro la lista fino a quando l'elemento dopo quello corrente sarà NULL o avrà indice > di quello di v
+    elemento *corrente= *testa;
+    while(corrente->next!=NULL && corrente->next->id < v){
+        corrente = corrente->next;
+    }
+
+    nuovo->next = corrente->next;
+    corrente->next = nuovo;
+}
+
 // n_nodi serve a qsort e disjoint-set, n_archi serve a kruskal per iterare
-grafo crea_grafo(arco **array_archi, int n_nodi,int n_archi){
+grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi, int hashsize){
+    grafo graph;
+    
     int *cCon = malloc(n_nodi*sizeof(int));
+    int numCoCo = n_nodi;
     if(cCon==NULL) termina("errore malloc array cCon durante creazione grafo");
 
 
     //ritorna la lista di archi con tutti i valori msf settati correttamente, popola cCon
-    arco **array_archi_msf = kruskal(array_archi,&cCon,n_nodi,n_archi);
+    arco **array_archi_msf = kruskal(array_archi,&cCon,n_nodi,n_archi,&numCoCo);
 
     //crea tabella hash e calcola il costo della msf 
+    // array di hashsize elementi che puntano tutti a NULL all'inizio
+    int costomsf = 0;
+    arco **gHash = calloc(hashsize,sizeof(arco *));
+    if(gHash == NULL) termina("errore calloc allocazione hash table durante creazione grafo");
+
+    for(int i=0; i<n_archi;i++){
+        arco *arco_corrente = array_archi[i];
+
+        if(arco_corrente->msf == true){
+            costomsf = costomsf + arco_corrente->weight;
+        }
+        
+        //inserimento nella tabella hash
+        int pos_hash = hash_arco(arco_corrente,hashsize);
+        arco_corrente->next = gHash[pos_hash];
+        gHash[pos_hash] = arco_corrente;
+    }
 
     //crea lista di adiacenza 
+    elemento **vicini = calloc(n_nodi,sizeof(elemento *));
+    for(int i=0; i<n_archi;i++){
+        int u = array_archi[i]->u;
+        int v = array_archi[i]->v;
+        int w = array_archi[i]->weight;
+        bool msf = array_archi[i]->msf;
 
+        inserisci_ordinato(&vicini[u],v,w,msf);
+        inserisci_ordinato(&vicini[v],u,w,msf);
+    }
 
+    graph.gHash = gHash;
+    graph.cCon = cCon;
+    graph.vicini = vicini;
+    graph.numCoCo = numCoCo;
+    graph.costoMSF = costomsf;
 
+    return graph;
 }

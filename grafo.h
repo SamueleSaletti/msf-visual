@@ -55,13 +55,15 @@ arco **parse_file(FILE *f, int *nodi, int *archi);
 // ALGORITMO DI KRUSKAL, dato il grafo ritorna la msf usando una disjoint-set ds per trovare se due nodi fanno parte dello stesso albero (e individuare i cicli)
 int confronta_archi(const void*a, const void*b);
 int find(nodo_union *array_nodi, int id_nodo);
-void union_rank(nodo_union *array_nodi, int root_x, int root_y);
-arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi);
+void union_rank(nodo_union *array_nodi, int root_x, int root_y,int*numCoCo);
+arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi, int*numCoCo);
 
 
 //funzione che dato l'array di archi parsato mi ritorna la rappresentazione del grafo applicando kruskal 
 //e popolando gHash, vicini e cCon, calcolando poi costoMSF e numCoCo
-grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi);
+int hash_arco(arco *arco, int hashsize);
+void inserisci_ordinato(elemento **testa,int v, int w, bool msf);
+grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi, int hashsize);
 
 // calcola il numero primo che precede n
 int primo_precedente(int n);
