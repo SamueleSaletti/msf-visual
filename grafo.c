@@ -6,6 +6,8 @@
 #include "grafo.h"
 #include <assert.h>
 
+#define QUI __LINE__,__FILE__
+
 
 
 void termina(const char *messaggio)
@@ -65,7 +67,7 @@ arco **parse_file(FILE *f, int *nodi, int *archi){
             *archi = atoi(strtok(NULL," \n"));
             
             // array che poi restituisco alla fine di questa funzione 
-            array_archi = malloc((*archi)* sizeof(arco*)); 
+            array_archi = calloc(*archi, sizeof(arco*)); 
             if(array_archi == NULL) termina("malloc array di archi fallita durante il parsing");
 
         } else if (strcmp(s,"a")== 0){
@@ -85,8 +87,6 @@ arco **parse_file(FILE *f, int *nodi, int *archi){
         }
     }
 
-    //questo perchè la getline lo alloca dinamicamente
-    if(buffer!=NULL) free(buffer);
     return array_archi;
 }
 
@@ -192,7 +192,7 @@ arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi,int *numCoCo
 int hash_arco(arco *arco, int hashsize){
     assert((arco->u) < (arco->v));
     //calcolo la chiave in questo modo
-    int h = arco->u *31 + arco->v;
+    long h = arco->u *31 + arco->v;
     return h % hashsize;
 }
 
@@ -235,12 +235,12 @@ grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi, int hashsize){
 
     //crea tabella hash e calcola il costo della msf 
     // array di hashsize elementi che puntano tutti a NULL all'inizio
-    int costomsf = 0;
+    long costomsf = 0;
     arco **gHash = calloc(hashsize,sizeof(arco *));
     if(gHash == NULL) termina("errore calloc allocazione hash table durante creazione grafo");
 
     for(int i=0; i<n_archi;i++){
-        arco *arco_corrente = array_archi[i];
+        arco *arco_corrente = array_archi_msf[i];
 
         if(arco_corrente->msf == true){
             costomsf = costomsf + arco_corrente->weight;
@@ -255,10 +255,10 @@ grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi, int hashsize){
     //crea lista di adiacenza 
     elemento **vicini = calloc(n_nodi,sizeof(elemento *));
     for(int i=0; i<n_archi;i++){
-        int u = array_archi[i]->u;
-        int v = array_archi[i]->v;
-        int w = array_archi[i]->weight;
-        bool msf = array_archi[i]->msf;
+        int u = array_archi_msf[i]->u;
+        int v = array_archi_msf[i]->v;
+        int w = array_archi_msf[i]->weight;
+        bool msf = array_archi_msf[i]->msf;
 
         inserisci_ordinato(&vicini[u],v,w,msf);
         inserisci_ordinato(&vicini[v],u,w,msf);
@@ -270,5 +270,7 @@ grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi, int hashsize){
     graph.numCoCo = numCoCo;
     graph.costoMSF = costomsf;
 
+    //libero l'array di puntatori e ma non gli archi che sono dentro la hash table
+    free(array_archi_msf);
     return graph;
 }

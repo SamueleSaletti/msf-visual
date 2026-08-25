@@ -1,10 +1,13 @@
 //include guard per evitare errori di duplicazione nel caso venisse includo l'header nel main più volte 
 #ifndef GRAFO_H
-#define GRAFO.H
+#define GRAFO_H
 
+#define _GNU_SOURCE
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
 
 
 // funzione di terminazione in caso di errore 
@@ -40,7 +43,14 @@ typedef struct {
   int *cCon;          // array delle componenti connesse
   int numCoCo;        // numero di componente connesse
   long costoMSF;      // costo della MSF 
+
   // CAMPI MULTITHREADING 
+  //array di dimensione nmutex per proteggere l'accesso alle entry della hash table
+  pthread_mutex_t *mut_gHash;
+
+  bool *componente_busy;
+  pthread_mutex_t mutex_comp;
+  pthread_cond_t cv_comp;  
 } grafo;
 
 // struct usata dalla union find per gestire i set, se un elemento corrisponde al parent è la root di quell'insieme
@@ -49,6 +59,25 @@ typedef struct {
     int rank;         // usato per la union by rank
     int min_id;       // usato per popolare più velocemente l'array cCon, visto che la root potrebbe non essere l'elemento con id minim
 } nodo_union;
+
+
+//struct per il tipo di operazione da inserire nel buffer produttori/consumatori
+typedef struct {
+    char *op;
+    int u;
+    int v;
+    int w;
+} operazione;
+
+// struct per i parametri di input dei threads consumatori
+typedef struct {
+    grafo *grafo;       //passo un puntatore al grafo costruito che condividono i threads
+    operazione *buffer;        // puntatore al buffer prod/cons, gli elementi sono le operazioni che devono svolgere i consumatori
+    int *pcindex;       // putnatore al index del consumatore
+    pthread_mutex_t *pmutex; // puntatore al mutex che protegge il buffer
+    sem_t *sem_free_slots; //puntatore al semaforo di sync, inzializzato a Buf_size
+    sem_t *sem_data_items; // inizalizzato a zero
+} dati;
 
 arco **parse_file(FILE *f, int *nodi, int *archi);
 
@@ -69,6 +98,8 @@ grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi, int hashsize);
 int primo_precedente(int n);
 bool is_prime(int n);
 
+
+// funzione che parsa il file delle operazioni
 
 
 
