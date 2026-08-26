@@ -1,5 +1,17 @@
 #include "xerrori.h"
 
+#define Buflen 100
+void xperror(int en, char *msg) {
+  char buf[Buflen];
+  
+  char *errmsg = strerror_r(en, buf, Buflen);
+  if(msg!=NULL)
+    fprintf(stderr,"%s: %s\n",msg, errmsg);
+  else
+    fprintf(stderr,"%s\n",errmsg);
+}
+
+
 //implementazione dei wrapper delle funzioni dei thread, mutex, semafori ecc
 
 // threads: creazione e join

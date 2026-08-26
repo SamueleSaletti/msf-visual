@@ -106,7 +106,7 @@ arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi, int*numCoCo
 
 //funzione che dato l'array di archi parsato mi ritorna la rappresentazione del grafo applicando kruskal 
 //e popolando gHash, vicini e cCon, calcolando poi costoMSF e numCoCo
-int hash_arco(arco *arco, int hashsize);
+int hash_arco(int u, int v, int hashsize);
 void inserisci_ordinato(elemento **testa,int v, int w, bool msf);
 grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi, int hashsize);
 
@@ -131,7 +131,21 @@ bool cancella_arco(grafo *graph, int u, int v);
 
 void *consumer_op(void *arg);
 
+//------ funzioni di ricalcolo ------
 
+typedef struct{
+    //calcolate con visita a gHash
+    int n_archi;
+    long costo_msf;
+    int pos_piene;
+    float l_media;
+    int l_max;
 
+    //calcolata con visita a cCon
+    int n_comp;
+} ricalcolo;
+
+int confronta_int(const void *a, const void *b);
+ricalcolo calcolo_finale(grafo *g);
 
 #endif 

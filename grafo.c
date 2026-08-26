@@ -190,7 +190,6 @@ arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi,int *numCoCo
 }
 
 int hash_arco(int u, int v, int hashsize){
-    assert(u<v);
     //calcolo la chiave in questo modo
     long h = u *31 + v;
     return h % hashsize;
@@ -348,6 +347,7 @@ bool rimuovi_da_ghash(arco **gHash, int h, int u, int v, bool *era_msf, int *pes
                 // sono in mezzo alla lista
                 prec->next = curr->next;
                 *era_msf = curr->msf;
+                *peso_rimosso = curr->weight;
                 free(curr);
                 return true;
             }
@@ -455,7 +455,7 @@ bool cancella_arco(grafo *graph, int u, int v){
     bool era_msf = false;
     int peso_rimosso = 0;
     // cancello l'arco dalla tabella hash
-    int h = hash_arco(u,v,&graph->hashsize);
+    int h = hash_arco(u,v,graph->hashsize);
     xpthread_mutex_lock(&graph->mut_gHash[h % graph->nmutex],QUI);
     bool esito = rimuovi_da_ghash(graph->gHash, h, u, v, &era_msf, &peso_rimosso);
     xpthread_mutex_unlock(&graph->mut_gHash[h % graph->nmutex],QUI);
@@ -472,6 +472,10 @@ bool cancella_arco(grafo *graph, int u, int v){
         if(c1 != c2) graph->componente_busy[c2] = false;
         xpthread_cond_broadcast(&graph->cv_comp, QUI);
         xpthread_mutex_unlock(&graph->mutex_comp, QUI);
+
+        xpthread_mutex_lock(&graph->mutex_comp,QUI);
+        graph->E --; 
+        xpthread_mutex_unlock(&graph->mutex_comp,QUI);
         return esito;
     } 
 
@@ -512,7 +516,7 @@ bool cancella_arco(grafo *graph, int u, int v){
     bool ho_splittato = false;
     if(best_u != -1){
         //in questo caso ho trovato l'arco di costo minimo, devo aggiungerlo alla msf in ghash e vicini
-        int h = hash_arco(best_u,best_v,&graph->hashsize);
+        int h = hash_arco(best_u,best_v,graph->hashsize);
         xpthread_mutex_lock(&graph->mut_gHash[h % graph->nmutex],QUI);
         aggiorna_gHash(graph->gHash, h, best_u, best_v);
         xpthread_mutex_unlock(&graph->mut_gHash[h % graph->nmutex],QUI);
@@ -611,3 +615,74 @@ void *consumer_op(void *arg){
     return NULL;
 }
 
+
+// ======================== OPERAZIONI DI RICALCOLO ===========================
+
+int confronta_int(const void *a, const void *b){
+    int arg1 = *(const int *)a;
+    int arg2 = *(const int *)b;
+    if(arg1<arg2) return -1;
+    if(arg1>arg2) return 1;
+    return 0;
+}
+
+ricalcolo calcolo_finale(grafo *g){
+    ricalcolo ric;
+    int n_archi = 0;
+    long costo_msf = 0;
+    int pos_piene = 0;
+    int l_max = 0;
+    float l_media;
+
+    //l_media sarà (n_archi / pos_piene)
+    // gHash ha dimensione hashsize
+    
+    for(int i=0;i<g->hashsize; i++){
+        //lista i della tabella hash
+        arco *curr = g->gHash[i];
+        if(curr==NULL){
+            continue;
+        }
+        int l_temp = 0;
+        while(curr!=NULL){
+            n_archi ++;
+            if(curr->msf) costo_msf += curr->weight;
+            l_temp ++;
+            curr = curr->next;
+        }
+        pos_piene++;
+        if(l_temp>l_max) l_max = l_temp;
+    }
+
+    if(pos_piene > 0){
+        l_media = (float)n_archi / pos_piene;
+    } else l_media = 0.0;
+
+    int n_comp = 0;
+    //calcolo del numero di componenti connesse con l'array cCon
+    int *copy = malloc(g->V*sizeof(int));
+    if(copy == NULL) termina("errore malloc array copia di cCon per ricalcolo componenti connesse");
+
+    mempcpy(copy,g->cCon,g->V * sizeof(int));
+    //ordino l'array copia e dopo calcolo il numero di elementi diversi
+    qsort(copy, g->V, sizeof(int), confronta_int);
+    
+    if(g->V > 0) n_comp++;
+    for(int i=1; i < g->V; i++){
+        if(copy[i] != copy[i-1]){
+            n_comp ++;
+        }
+    }
+
+    free(copy);
+
+    ric.n_archi = n_archi;
+    ric.costo_msf = costo_msf;
+    ric.pos_piene = pos_piene;
+    ric.l_media = l_media;
+    ric.l_max = l_max;
+    ric.n_comp = n_comp;
+
+    return ric;
+
+}

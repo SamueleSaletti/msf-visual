@@ -19,6 +19,8 @@
 #include <fcntl.h>           /* For O_* constants */
 #include <pthread.h>
 
+void xperror(int en, char *msg);
+
 // thread
 int xpthread_create(pthread_t *thread, const pthread_attr_t *attr,
                           void *(*start_routine) (void *), void *arg, int linea, char *file);

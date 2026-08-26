@@ -16,7 +16,7 @@ msf.out: $(OGGETTI)
 
 grafo.o: grafo.h xerrori.h
 main.o: grafo.h xerrori.h
-xerrori.o: xerror.h
+xerrori.o: xerrori.h
  
 
 .PHONY: all clean 
