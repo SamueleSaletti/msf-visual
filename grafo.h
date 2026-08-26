@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include "xerrori.h"
 
 
 // funzione di terminazione in caso di errore 
@@ -43,13 +44,17 @@ typedef struct {
   int *cCon;          // array delle componenti connesse
   int numCoCo;        // numero di componente connesse
   long costoMSF;      // costo della MSF 
-
+  
+  int V; //numero nodi
+  int E; // numero archi
+  int hashsize; // non viene modificato
   // CAMPI MULTITHREADING 
   //array di dimensione nmutex per proteggere l'accesso alle entry della hash table
   pthread_mutex_t *mut_gHash;
+  int nmutex; // anche questo non viene modificato
 
   bool *componente_busy;
-  pthread_mutex_t mutex_comp;
+  pthread_mutex_t mutex_comp; // protegge numcoco, costomsf, ccon, componente_busy
   pthread_cond_t cv_comp;  
 } grafo;
 
@@ -63,7 +68,7 @@ typedef struct {
 
 //struct per il tipo di operazione da inserire nel buffer produttori/consumatori
 typedef struct {
-    char *op;
+    char type;
     int u;
     int v;
     int w;
@@ -77,7 +82,18 @@ typedef struct {
     pthread_mutex_t *pmutex; // puntatore al mutex che protegge il buffer
     sem_t *sem_free_slots; //puntatore al semaforo di sync, inzializzato a Buf_size
     sem_t *sem_data_items; // inizalizzato a zero
+    int buffer_size;
 } dati;
+
+typedef struct nodo_coda{
+    int id;
+    struct nodo_coda *next;
+} nodo_coda;
+
+typedef struct {
+    nodo_coda *head;
+    nodo_coda *tail;
+} coda_bfs;
 
 arco **parse_file(FILE *f, int *nodi, int *archi);
 
@@ -98,8 +114,22 @@ grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi, int hashsize);
 int primo_precedente(int n);
 bool is_prime(int n);
 
+//----------------------------------------------------------
 
-// funzione che parsa il file delle operazioni
+//funzioni usate per cancella arco dei threads consumatori
+bool is_empty(coda_bfs *q);
+void enqueue(coda_bfs *q, int id_nodo);
+int dequeue(coda_bfs *q);
+
+void aggiorna_gHash(arco **gHash,int h,int best_u, int best_v);
+bool rimuovi_da_ghash(arco **gHash, int h, int u, int v, bool *era_msf, int *peso_rimosso);
+void aggiorna_vicini(elemento **vicini, int id1, int id2);
+void rimuovi_da_vicini(elemento **vicini, int id1, int id2);
+bool *bfs_msf(grafo *g, int id_start);
+
+bool cancella_arco(grafo *graph, int u, int v);
+
+void *consumer_op(void *arg);
 
 
 

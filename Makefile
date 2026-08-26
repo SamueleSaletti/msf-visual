@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -std=c11 -Wall -g -O3 
 LDLIBS = -pthread
 
-SORGENTI = main.c grafo.c
+SORGENTI = main.c grafo.c xerrori.c
 #sostituisco i nomi dei sorgenti con il loro corrispettivo in file oggetto
 OGGETTI = $(SORGENTI:.c=.o) 
 
@@ -14,8 +14,9 @@ msf.out: $(OGGETTI)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@ $(LDLIBS)
 
-grafo.o: grafo.h
-main.o: grafo.h 
+grafo.o: grafo.h xerrori.h
+main.o: grafo.h xerrori.h
+xerrori.o: xerror.h
  
 
 .PHONY: all clean 
