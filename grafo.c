@@ -471,9 +471,7 @@ bool cancella_arco(grafo *graph, int u, int v){
         graph->componente_busy[c1] = false;
         if(c1 != c2) graph->componente_busy[c2] = false;
         xpthread_cond_broadcast(&graph->cv_comp, QUI);
-        xpthread_mutex_unlock(&graph->mutex_comp, QUI);
-
-        xpthread_mutex_lock(&graph->mutex_comp,QUI);
+        
         graph->E --; 
         xpthread_mutex_unlock(&graph->mutex_comp,QUI);
         return esito;
@@ -562,8 +560,9 @@ bool cancella_arco(grafo *graph, int u, int v){
     xpthread_mutex_lock(&graph->mutex_comp,QUI);
     
     graph->costoMSF += differenza_costo_msf;
-    if(ho_splittato) graph->numCoCo ++;
-    
+    if(ho_splittato) {
+        graph->numCoCo ++;
+    }
     graph->componente_busy[c1] = false;
     if(c1!=c2) graph->componente_busy[c2] = false;
 
