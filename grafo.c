@@ -225,7 +225,7 @@ grafo crea_grafo(arco **array_archi, int n_nodi, int n_archi, int hashsize){
     grafo graph;
     
     int *cCon = malloc(n_nodi*sizeof(int));
-    int numCoCo = n_nodi;
+    int numCoCo = n_nodi; //all'inizio il numero di componenti connesse è uguale al numero di nodi, ogni volta che faccio merge di componenti decremento questo valore
     if(cCon==NULL) termina("errore malloc array cCon durante creazione grafo");
 
 
