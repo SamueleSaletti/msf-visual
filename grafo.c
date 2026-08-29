@@ -96,9 +96,15 @@ int confronta_archi(const void*a, const void*b){
     // a e b sono puntatori a elementi dell'array che sono a loro volta puntatori quindi saranno di tipo arco**
     const arco *arco_a= *(arco**) a; //devo deferenziare il puntatore per ottenere il putnatore all'arco
     const arco *arco_b = *(arco**) b;
-    if((arco_a->weight)<(arco_b->weight)) return -1;
-    else if((arco_a->weight)>(arco_b->weight)) return 1;
-    else return 0;
+    if(arco_a->weight < arco_b->weight) return -1;
+    if(arco_a->weight > arco_b->weight) return 1;
+    
+    // Criterio di spareggio deterministico sugli ID
+    if(arco_a->u < arco_b->u) return -1;
+    if(arco_a->u > arco_b->u) return 1;
+    if(arco_a->v < arco_b->v) return -1;
+    if(arco_a->v > arco_b->v) return 1;
+    return 0;
 }
 
 // ritorna l'id del nodo root del set a cui appartiene id_nodo 
@@ -191,7 +197,9 @@ arco **kruskal(arco**array_archi, int **cCon,int n_nodi,int n_archi,int *numCoCo
 
 int hash_arco(int u, int v, int hashsize){
     //calcolo la chiave in questo modo
-    long h = u *31 + v;
+    int min_node = (u < v) ? u : v;
+    int max_node = (u > v) ? u : v;
+    long h = min_node * 31 + max_node;
     return h % hashsize;
 }
 
@@ -320,7 +328,7 @@ int dequeue(coda_bfs *q){
 void aggiorna_gHash(arco **gHash,int h,int best_u, int best_v){
     arco *curr = gHash[h];
     while(curr != NULL){
-        if(curr->u == best_u && curr->v == best_v){
+        if((curr->u == best_u && curr->v == best_v) || (curr->u == best_v && curr->v == best_u)){
             assert(curr->msf == false);
             curr->msf = true;
             break;
@@ -335,7 +343,7 @@ bool rimuovi_da_ghash(arco **gHash, int h, int u, int v, bool *era_msf, int *pes
     arco *curr = gHash[h];
     arco *prec = NULL;
     while(curr != NULL){
-        if(curr->u == u && curr->v == v){
+        if((curr->u == u && curr->v == v) || (curr->u == v && curr->v == u)){
             //se sto eliminando la testa
             if(prec == NULL){
                 gHash[h] = curr->next;
@@ -430,7 +438,10 @@ bool cancella_arco(grafo *graph, int u, int v){
     //mutex che protegge tutti i parametri del grafo
     xpthread_mutex_lock(&graph->mutex_comp,QUI);
     
-    if(u<0 || u >= graph->V || v<0 || v >= graph->V) return false; //OPERAZIONE NON VALIDA
+    if(u<0 || u >= graph->V || v<0 || v >= graph->V){
+        xpthread_mutex_unlock(&graph->mutex_comp,QUI);
+        return false; //OPERAZIONE NON VALIDA
+    } 
 
     // id della componente connessa a cui appartengono u e v
     int c1 = graph->cCon[u];
@@ -470,16 +481,17 @@ bool cancella_arco(grafo *graph, int u, int v){
         xpthread_mutex_lock(&graph->mutex_comp, QUI);
         graph->componente_busy[c1] = false;
         if(c1 != c2) graph->componente_busy[c2] = false;
+
+        if (esito == true) {
+            graph->E --; 
+        }
         xpthread_cond_broadcast(&graph->cv_comp, QUI);
-        
-        graph->E --; 
+
+        //stampo op | u | v | E | numCoCo | costoMSF
+        printf("- %d %d %d %d %ld \n", u, v, graph->E, graph->numCoCo, graph->costoMSF);
         xpthread_mutex_unlock(&graph->mutex_comp,QUI);
         return esito;
     } 
-
-    xpthread_mutex_lock(&graph->mutex_comp,QUI);
-    graph->E --; //qui sono sicuro di aver rimosso l'arco
-    xpthread_mutex_unlock(&graph->mutex_comp,QUI);
 
     // l'arco era nella msf, faccio una visita della msf a partire da u e poi da v
     bool *Lu = bfs_msf(graph, u);   //DA DEALLOCARE
@@ -512,6 +524,10 @@ bool cancella_arco(grafo *graph, int u, int v){
 
     int differenza_costo_msf = -peso_rimosso; // devo sommarci min_peso se l'ho aggiunto, altrimenti niente
     bool ho_splittato = false;
+    //sono i primi id in Lu e Lv con campo true
+    int nuovo_id_u = -1;
+    int nuovo_id_v = -1;
+
     if(best_u != -1){
         //in questo caso ho trovato l'arco di costo minimo, devo aggiungerlo alla msf in ghash e vicini
         int h = hash_arco(best_u,best_v,graph->hashsize);
@@ -526,9 +542,7 @@ bool cancella_arco(grafo *graph, int u, int v){
     } else{
         //in questo caso la componente si è spezzata, devo ricalcolare cCon
         
-        //sono i primi id in Lu e Lv con campo true
-        int nuovo_id_u = -1;
-        int nuovo_id_v = -1;
+        
 
         for(int i=0; i<graph->V; i++){
             if(Lu[i] == true){
@@ -544,8 +558,14 @@ bool cancella_arco(grafo *graph, int u, int v){
         }
 
         ho_splittato = true;
-        
-        xpthread_mutex_lock(&graph->mutex_comp, QUI);
+
+    }
+
+    xpthread_mutex_lock(&graph->mutex_comp,QUI);
+    graph->E--;
+    graph->costoMSF += differenza_costo_msf;
+    if(ho_splittato) {
+        graph->numCoCo ++;
         for(int i=0; i<graph->V; i++){
             if(Lu[i]== true){
                 graph->cCon[i] = nuovo_id_u;
@@ -553,21 +573,14 @@ bool cancella_arco(grafo *graph, int u, int v){
                 graph->cCon[i] = nuovo_id_v;
             }
         }
-        xpthread_mutex_unlock(&graph->mutex_comp, QUI);
-
-    }
-
-    xpthread_mutex_lock(&graph->mutex_comp,QUI);
-    
-    graph->costoMSF += differenza_costo_msf;
-    if(ho_splittato) {
-        graph->numCoCo ++;
     }
     graph->componente_busy[c1] = false;
     if(c1!=c2) graph->componente_busy[c2] = false;
 
     xpthread_cond_broadcast(&graph->cv_comp,QUI);
 
+    //stampo op | u | v | E | numCoCo | costoMSF
+    printf("- %d %d %d %d %ld \n", u, v, graph->E, graph->numCoCo, graph->costoMSF);
     xpthread_mutex_unlock(&graph->mutex_comp,QUI);
     
     free(Lu);
@@ -596,13 +609,7 @@ void *consumer_op(void *arg){
             continue;
         } else if (op.type == '-'){
             esito = cancella_arco(a->grafo,op.u,op.v);
-            if(esito){
-                //operazione valida 
-                //stampo op | u | v | E | numCoCo | costoMSF
-                xpthread_mutex_lock(&a->grafo->mutex_comp,QUI);
-                printf("%c %d %d %d %d %ld \n", op.type, op.u, op.v, a->grafo->E, a->grafo->numCoCo, a->grafo->costoMSF);
-                xpthread_mutex_unlock(&a->grafo->mutex_comp,QUI);
-            } else {
+            if(!esito){
                 printf("%c %d %d 0 \n", op.type, op.u, op.v);
             }
         }
