@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Visualizzatore Grafo</title>
+    <!-- Usa Vis.js Network per renderizzare i grafi facilmente -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        #mynetwork { width: 800px; height: 600px; border: 1px solid lightgray; }
+    </style>
+</head>
+<body>
+    <button id="loadBtn">1. Carica e Inizializza MSF</button>
+    <button id="startBtn" disabled>2. Avvia Threads (Cancellazioni)</button>
+    
+    <div id="stats"></div>
+    <div id="mynetwork"></div>
+
+    <script>
+        const socket = io();
+        let nodes = new vis.DataSet([]);
+        let edges = new vis.DataSet([]);
+        let network = null;
+
+        document.getElementById('loadBtn').onclick = () => {
+            socket.emit('start_process', {});
+        };
+
+        document.getElementById('startBtn').onclick = () => {
+            socket.emit('resume_threads'); // Manda il segnale per sbloccare il C
+        };
+
+        socket.on('update', (msg) => {
+            if (msg.type === 'init_stats') {
+                document.getElementById('stats').innerHTML = `Archi: ${msg.n_archi} | MSF Cost: ${msg.costoMSF}`;
+            } 
+            else if (msg.type === 'graph_data') {
+                // Inizializza il canvas vis.js con gli archi che ti manda il C
+                // Evidenzia la MSF magari mettendola in colore rosso o spessore maggiore
+                msg.edges.forEach(e => {
+                    if(e.u && e.v) {
+                        nodes.update({id: e.u, label: e.u.toString()});
+                        nodes.update({id: e.v, label: e.v.toString()});
+                        edges.add({
+                            id: `${e.u}-${e.v}`, 
+                            from: e.u, 
+                            to: e.v,
+                            color: e.is_msf ? 'red' : 'blue', // Marca la MSF!
+                            width: e.is_msf ? 3 : 1
+                        });
+                    }
+                });
+                
+                let container = document.getElementById('mynetwork');
+                network = new vis.Network(container, { nodes, edges }, {});
+                document.getElementById('startBtn').disabled = false;
+            }
+            else if (msg.type === 'edge_deleted') {
+                // Il backend C ha appena eliminato questo arco in modo concorrente
+                try {
+                    edges.remove(`${msg.u}-${msg.v}`);
+                } catch(e) {}
+            }
+            else if (msg.type === 'final_stats') {
+                document.getElementById('stats').innerHTML += `<br>Ricalcolo: Nuova MSF Cost = ${msg.costo_msf}`;
+                alert("Operazioni terminate!");
+            }
+            // Nel tuo socket.on('update') dentro l'HTML:
+            else if (msg.type === 'edge_deleted') {
+            // 1. Rimuovi l'arco cancellato
+                try {
+                    edges.remove(`${msg.u}-${msg.v}`);
+                    edges.remove(`${msg.v}-${msg.u}`); // Per sicurezza per gli archi non orientati
+                } catch(e) {}
+
+            // 2. Se è stato trovato un nuovo arco MSF, evidenzialo!
+                if (msg.new_msf_u !== -1 && msg.new_msf_v !== -1) {
+                    try {
+                       // Aggiorna l'arco sostitutivo mettendolo in ROSSO (o marcandolo MSF)
+                        edges.update({
+                            id: `${msg.new_msf_u}-${msg.new_msf_v}`,
+                            color: 'red',
+                            width: 3
+                        });
+                        edges.update({ // Nel caso l'ID sia salvato all'inverso
+                        id: `${msg.new_msf_v}-${msg.new_msf_u}`,
+                        color: 'red',
+                        width: 3
+                        });
+                    } catch(e) {}
+                }
+
+                // 3. Aggiorna i testi delle statistiche in diretta!
+                document.getElementById('stats').innerHTML = `Archi Rimasti: ${msg.E} | Componenti Connesse: ${msg.numCoCo} | Costo MSF Corrente: ${msg.costoMSF}`;
+            }
+        });
+    </script>
+</body>
+</html>

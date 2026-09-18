@@ -22,4 +22,4 @@ xerrori.o: xerrori.h
 .PHONY: all clean 
 
 clean:
-	rm -f $(OGGETTI) msf.out 
+	rm -f $(OGGETTI)

@@ -95,6 +95,9 @@ typedef struct {
     nodo_coda *tail;
 } coda_bfs;
 
+//supporto per la stampa json
+void stampa_grafo_json(grafo *g);
+
 arco **parse_file(FILE *f, int *nodi, int *archi);
 
 // ALGORITMO DI KRUSKAL, dato il grafo ritorna la msf usando una disjoint-set ds per trovare se due nodi fanno parte dello stesso albero (e individuare i cicli)

@@ -74,8 +74,18 @@ int main(int argc, char *argv[]){
     //n_nodi contiene già il numero del file +1 perchè è compreso anche il nodo con ID=0
     grafo graph = crea_grafo(archi_temporanei, n_nodi, n_archi, hash_size);
 
-    //stampa su stdout: N_ARCHI, NUMERO COMP CONNESSE, COSTO MSF
-    fprintf(stdout,"%d %d %ld\n", n_archi, graph.numCoCo, graph.costoMSF);
+    // 1. STAMPA STATISTICHE INIZIALI
+    fprintf(stdout, "{\"type\": \"init_stats\", \"n_archi\": %d, \"numCoCo\": %d, \"costoMSF\": %ld}\n", n_archi, graph.numCoCo, graph.costoMSF);
+    fflush(stdout);
+
+    // 2. STAMPA TUTTI GLI ARCHI USANDO LA NUOVA FUNZIONE
+    stampa_grafo_json(&graph);
+
+    // 3. ASPETTA IL VIA DAL WEB
+    char cmd[20];
+    if (fgets(cmd, sizeof(cmd), stdin) != NULL) {
+        // Avviamo i threads
+    }
 
     // ---------------------------------- ININZIO THREADS
     assert(num_threads>0);
@@ -186,13 +196,12 @@ int main(int argc, char *argv[]){
 
     fprintf(stdout, "Operazioni terminate\n");
 
+    // 4. STAMPE FINALI IN JSON
     ricalcolo ric = calcolo_finale(&graph);
 
-    //stampe finali
-    fprintf(stdout, "Numero posizioni non vuote: %d\n",ric.pos_piene);
-    fprintf(stdout, "Lunghezza media liste: %f\n",ric.l_media);
-    fprintf(stdout, "Lunghezza massima liste: %d\n",ric.l_max);
-    fprintf(stdout, "%d %d %ld\n", ric.n_archi, ric.n_comp, ric.costo_msf);
+    fprintf(stdout, "{\"type\": \"final_stats\", \"pos_piene\": %d, \"l_media\": %f, \"l_max\": %d, \"n_archi\": %d, \"n_comp\": %d, \"costo_msf\": %ld}\n",
+            ric.pos_piene, ric.l_media, ric.l_max, ric.n_archi, ric.n_comp, ric.costo_msf);
+    fflush(stdout);
 
 
     //------------------deallocazione variabili multithreading-----------------

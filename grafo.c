@@ -487,8 +487,10 @@ bool cancella_arco(grafo *graph, int u, int v){
         }
         xpthread_cond_broadcast(&graph->cv_comp, QUI);
 
-        //stampo op | u | v | E | numCoCo | costoMSF
-        printf("- %d %d %d %d %ld \n", u, v, graph->E, graph->numCoCo, graph->costoMSF);
+        // Passo new_msf_u e new_msf_v a -1 per indicare che non ci sono nuovi archi promossi a MSF
+        fprintf(stdout, "{\"type\": \"edge_deleted\", \"u\": %d, \"v\": %d, \"E\": %d, \"numCoCo\": %d, \"costoMSF\": %ld, \"new_msf_u\": -1, \"new_msf_v\": -1}\n", 
+                u, v, graph->E, graph->numCoCo, graph->costoMSF);
+        fflush(stdout);
         xpthread_mutex_unlock(&graph->mutex_comp,QUI);
         return esito;
     } 
@@ -579,8 +581,10 @@ bool cancella_arco(grafo *graph, int u, int v){
 
     xpthread_cond_broadcast(&graph->cv_comp,QUI);
 
-    //stampo op | u | v | E | numCoCo | costoMSF
-    printf("- %d %d %d %d %ld \n", u, v, graph->E, graph->numCoCo, graph->costoMSF);
+    // Includiamo best_u e best_v (se sono != -1, il frontend li evidenzierà come nuova MSF)
+    fprintf(stdout, "{\"type\": \"edge_deleted\", \"u\": %d, \"v\": %d, \"E\": %d, \"numCoCo\": %d, \"costoMSF\": %ld, \"new_msf_u\": %d, \"new_msf_v\": %d}\n", 
+            u, v, graph->E, graph->numCoCo, graph->costoMSF, best_u, best_v);
+    fflush(stdout);
     xpthread_mutex_unlock(&graph->mutex_comp,QUI);
     
     free(Lu);
@@ -605,12 +609,16 @@ void *consumer_op(void *arg){
 
         bool esito;
         if(op.type == '+'){
-            printf("%c %d %d %d 0 \n", op.type, op.u, op.v, op.w);
+            // MODIFICA QUI: JSON per operazioni di add (ignorate)
+            fprintf(stdout, "{\"type\": \"op_ignored\", \"op\": \"+\", \"u\": %d, \"v\": %d}\n", op.u, op.v);
+            fflush(stdout);
             continue;
         } else if (op.type == '-'){
             esito = cancella_arco(a->grafo,op.u,op.v);
             if(!esito){
-                printf("%c %d %d 0 \n", op.type, op.u, op.v);
+                // MODIFICA QUI: JSON per operazione di cancellazione su arco non esistente
+                fprintf(stdout, "{\"type\": \"op_failed\", \"op\": \"-\", \"u\": %d, \"v\": %d}\n", op.u, op.v);
+                fflush(stdout);
             }
         }
 
@@ -691,4 +699,31 @@ ricalcolo calcolo_finale(grafo *g){
 
     return ric;
 
+}
+
+
+
+
+void stampa_grafo_json(grafo *g) {
+    fprintf(stdout, "{\"type\": \"graph_data\", \"edges\": [");
+    bool primo = true;
+    
+    // Iteriamo sulla tabella hash per prendere ogni arco una sola volta
+    for (int i = 0; i < g->hashsize; i++) {
+        arco *corrente = g->gHash[i];
+        while (corrente != NULL) {
+            if (!primo) {
+                fprintf(stdout, ", ");
+            }
+            // Stampiamo u, v, peso e se fa parte o meno della MSF (true/false)
+            fprintf(stdout, "{\"u\": %d, \"v\": %d, \"w\": %d, \"is_msf\": %s}", 
+                    corrente->u, corrente->v, corrente->weight, 
+                    corrente->msf ? "true" : "false");
+            
+            primo = false;
+            corrente = corrente->next;
+        }
+    }
+    fprintf(stdout, "]}\n");
+    fflush(stdout); // FONDAMENTALE per far leggere subito i dati a Node.js!
 }
